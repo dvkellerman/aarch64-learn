@@ -1,0 +1,355 @@
+================================================================================
+AARCH64 ASSEMBLY LEARNING GUIDE
+================================================================================
+
+This collection provides comprehensive examples of aarch64 assembly instructions
+organized by category for easy learning and reference.
+
+FILES CREATED:
+--------------
+1. hello_aarch64.s           - Simple "Hello, World!" program
+2. aarch64_examples.s        - Core instruction set examples
+3. aarch64_floating_point.s  - Floating-point and SIMD/NEON examples
+4. aarch64_advanced.s        - Atomics, barriers, and exception handling
+
+================================================================================
+INSTRUCTION CATEGORIES COVERED
+================================================================================
+
+FILE: aarch64_examples.s
+------------------------
+1. Data Movement Instructions
+   - MOV, MOVZ, MOVN, MOVK, MVN
+   - Moving immediates and registers
+   - Building 64-bit constants
+
+2. Arithmetic Instructions
+   - ADD, ADDS, ADC (addition with carry)
+   - SUB, SUBS, SBC (subtraction with carry)
+   - NEG, NEGS (negation)
+   - Increment/decrement patterns
+
+3. Logical Instructions
+   - AND, ANDS, ORR, ORN
+   - EOR, EON (XOR operations)
+   - BIC, BICS (bit clear)
+   - TST (test bits)
+
+4. Shift and Bit Manipulation
+   - LSL, LSR (logical shifts)
+   - ASR (arithmetic shift right)
+   - ROR (rotate right)
+   - REV, REV32, REV16 (reverse bytes)
+   - RBIT (reverse bits)
+   - CLZ (count leading zeros)
+   - CLS (count leading sign bits)
+
+5. Comparison Instructions
+   - CMP (compare)
+   - CMN (compare negative)
+   - TST (test)
+
+6. Branch and Control Flow
+   - B (unconditional branch)
+   - B.cond (conditional branches: EQ, NE, GT, LT, GE, LE, HI, LO, etc.)
+   - BL, BLR (branch with link - function calls)
+   - BR (branch to register)
+   - RET (return)
+
+7. Load/Store Instructions
+   - LDR, STR (load/store register)
+   - LDRH, STRH (halfword - 16-bit)
+   - LDRB, STRB (byte - 8-bit)
+   - LDRSW, LDRSH, LDRSB (sign-extended loads)
+   - LDP, STP (load/store pair)
+   - Pre-indexed and post-indexed addressing
+   - Register offset addressing
+
+8. Multiply and Divide
+   - MUL, MNEG (multiply and negate)
+   - SMULL, UMULL (multiply long - 32 to 64 bit)
+   - SMULH, UMULH (multiply high - upper 64 bits)
+   - MADD, MSUB (multiply-add/subtract)
+   - UDIV, SDIV (unsigned/signed division)
+
+9. Conditional Select
+   - CSEL (conditional select)
+   - CSINC, CSINV, CSNEG (conditional select with increment/invert/negate)
+   - CSET, CSETM (conditional set)
+   - CINC, CINV, CNEG (conditional increment/invert/negate)
+
+10. Bit Field Instructions
+    - BFM, UBFM, SBFM (bit field move)
+    - BFI, BFXIL (bit field insert)
+    - UBFIZ, SBFIZ (bit field insert in zero)
+    - UBFX, SBFX (bit field extract)
+    - EXTR (extract register)
+
+FILE: aarch64_floating_point.s
+-------------------------------
+1. Floating-Point Data Movement
+   - FMOV (move FP values, including FP <-> general register)
+   - FABS (absolute value)
+   - FNEG (negate)
+   - FSQRT (square root)
+
+2. Floating-Point Arithmetic
+   - FADD, FSUB (addition, subtraction)
+   - FMUL, FDIV (multiplication, division)
+   - FMADD, FMSUB (fused multiply-add/subtract)
+   - FNMADD, FNMSUB (negated fused multiply-add/subtract)
+   - FMAX, FMIN, FMAXNM, FMINNM (maximum, minimum)
+   - FRINT family (rounding: nearest, +inf, -inf, zero)
+
+3. Floating-Point Conversion
+   - FCVT (convert between single/double/half precision)
+   - SCVTF, UCVTF (integer to floating-point)
+   - FCVTZS, FCVTZU (floating-point to integer, toward zero)
+   - FCVTNS, FCVTNU (toward nearest)
+   - FCVTPS, FCVTMS (toward +inf, -inf)
+   - FCVTAS (ties away from zero)
+
+4. Floating-Point Comparison
+   - FCMP, FCMPE (compare)
+   - FCCMP (conditional compare)
+   - FCSEL (conditional select)
+
+5. SIMD Vector Operations - Basic
+   - LD1, LD2 (load vectors)
+   - ST1 (store vectors)
+   - DUP (duplicate to all lanes)
+   - MOV, MOVI (vector move, move immediate)
+   - INS (insert element)
+   - UMOV (extract element)
+   - EXT (extract from pair)
+   - ZIP1, ZIP2 (zip/interleave)
+   - UZP1, UZP2 (unzip/deinterleave)
+   - TRN1, TRN2 (transpose)
+   - REV64, REV32, REV16 (reverse)
+   - TBL (table lookup)
+
+6. SIMD Arithmetic
+   - ADD, SUB (vector addition, subtraction)
+   - MUL (vector multiply)
+   - MLA, MLS (multiply-accumulate/subtract)
+   - ADDP (pairwise add)
+   - SMAX, SMIN, UMAX, UMIN (maximum, minimum)
+   - ADDV (add across vector)
+   - SMAXV, SMINV (max/min across vector)
+   - ABS, NEG (absolute value, negate)
+   - SQADD, SQSUB (saturating arithmetic - signed)
+   - UQADD, UQSUB (saturating arithmetic - unsigned)
+   - SHL, SSHR, USHR (shift operations)
+   - SSHLL, USHLL (shift left long - widen)
+
+7. SIMD Logical Operations
+   - AND, ORR, EOR (bitwise operations)
+   - BIC, ORN (bit clear, OR NOT)
+   - MVN, NOT (bitwise NOT)
+   - BSL (bitwise select)
+   - BIT, BIF (bitwise insert)
+   - CNT (count bits set)
+   - CLS, CLZ (count leading sign/zeros)
+   - RBIT (reverse bits)
+
+FILE: aarch64_advanced.s
+------------------------
+1. Atomic Operations (Load-Acquire/Store-Release)
+   - LDAR, LDARH, LDARB (load-acquire)
+   - STLR, STLRH, STLRB (store-release)
+   - Acquire/Release memory ordering semantics
+
+2. Load/Store Exclusive (Compare-and-Swap primitives)
+   - LDXR, STXR (exclusive access for 64/32-bit)
+   - LDXRH, STXRH (exclusive halfword)
+   - LDXRB, STXRB (exclusive byte)
+   - LDAXR, STLXR (exclusive with acquire/release)
+   - LDXP, STXP (exclusive pair - 128-bit atomic)
+   - LDAXP, STLXP (exclusive pair with acquire/release)
+   - CLREX (clear exclusive monitor)
+
+3. Memory Barrier Instructions
+   - DMB (data memory barrier)
+   - DSB (data synchronization barrier)
+   - ISB (instruction synchronization barrier)
+   - Barrier scopes: SY, ISH, OSH, NSH
+   - Barrier types: full, LD (load), ST (store)
+
+4. Atomic Read-Modify-Write (ARMv8.1+)
+   - LDADD, LDADDA, LDADDL, LDADDAL (atomic add)
+   - LDCLR (atomic clear/AND NOT)
+   - LDEOR (atomic XOR)
+   - LDSET (atomic OR/set bits)
+   - LDSMAX, LDSMIN (atomic signed max/min)
+   - LDUMAX, LDUMIN (atomic unsigned max/min)
+   - SWP, SWPA, SWPL, SWPAL (atomic swap)
+   - CAS, CASA, CASL, CASAL (compare-and-swap)
+   - CASB, CASH (CAS byte/halfword)
+   - CASP (compare-and-swap pair - 128-bit)
+
+5. Synchronization Primitives
+   - Spinlock implementation (using LDAXR/STLXR)
+   - Atomic counter increment
+   - Test-and-Set lock
+   - Producer-consumer patterns
+
+6. Exception Handling Concepts
+   - SVC (supervisor call - system calls)
+   - HVC (hypervisor call)
+   - SMC (secure monitor call)
+   - BRK (breakpoint for debugging)
+   - HLT (halt instruction)
+   - ERET (exception return)
+   - System register access (MRS/MSR)
+
+================================================================================
+REGISTER INFORMATION
+================================================================================
+
+General Purpose Registers (64-bit):
+  x0-x30   - 64-bit general purpose registers
+  w0-w30   - 32-bit versions (lower 32 bits of x0-x30)
+  x29 (fp) - Frame pointer
+  x30 (lr) - Link register (return address)
+  sp       - Stack pointer
+  xzr/wzr  - Zero register
+
+Floating-Point/SIMD Registers:
+  v0-v31   - 128-bit vector registers
+  d0-d31   - 64-bit double precision (lower 64 bits of v0-v31)
+  s0-s31   - 32-bit single precision (lower 32 bits of v0-v31)
+  h0-h31   - 16-bit half precision (lower 16 bits of v0-v31)
+  b0-b31   - 8-bit byte access (lower 8 bits of v0-v31)
+
+Vector Lane Formats:
+  .16b  - 16 x 8-bit bytes
+  .8h   - 8 x 16-bit halfwords
+  .4s   - 4 x 32-bit words (single precision float)
+  .2d   - 2 x 64-bit doublewords (double precision float)
+
+Condition Codes (for branches):
+  EQ - Equal (Z set)
+  NE - Not equal (Z clear)
+  GT - Greater than (signed)
+  LT - Less than (signed)
+  GE - Greater or equal (signed)
+  LE - Less or equal (signed)
+  HI - Higher (unsigned)
+  LO - Lower (unsigned)
+  HS - Higher or same (unsigned)
+  LS - Lower or same (unsigned)
+  MI - Minus (N set)
+  PL - Plus (N clear)
+  VS - Overflow (V set)
+  VC - No overflow (V clear)
+
+================================================================================
+COMPILING AND RUNNING
+================================================================================
+
+To compile any assembly file:
+  as -o output.o input.s
+  ld -o output output.o
+  ./output
+
+To compile the example files:
+  as -o hello_aarch64.o hello_aarch64.s
+  ld -o hello_aarch64 hello_aarch64.o
+  ./hello_aarch64
+
+  as -o aarch64_examples.o aarch64_examples.s
+  ld -o aarch64_examples aarch64_examples.o
+  ./aarch64_examples
+
+  as -o aarch64_floating_point.o aarch64_floating_point.s
+  ld -o aarch64_floating_point aarch64_floating_point.o
+  ./aarch64_floating_point
+
+  as -o aarch64_advanced.o aarch64_advanced.s
+  ld -o aarch64_advanced aarch64_advanced.o
+  ./aarch64_advanced
+
+================================================================================
+MACOS SPECIFIC NOTES
+================================================================================
+
+1. Entry point must be _main (not _start like Linux)
+2. System calls use svc #0x80 (not svc #0)
+3. System call number goes in x16 (not x8)
+4. Position-independent addressing uses adrp/add with @PAGE/@PAGEOFF
+
+================================================================================
+MEMORY ORDERING AND SYNCHRONIZATION
+================================================================================
+
+Memory Ordering Types:
+1. Relaxed: No ordering guarantees (normal LDR/STR)
+2. Acquire: Subsequent operations can't move before this load
+3. Release: Previous operations can't move after this store
+4. Acquire-Release: Both acquire and release semantics
+5. Sequential Consistency: Strongest ordering (all operations in order)
+
+Instruction Suffixes for Atomics:
+- No suffix: Relaxed ordering
+- A suffix: Acquire semantics (loads)
+- L suffix: Release semantics (stores)
+- AL suffix: Acquire-Release semantics
+
+Barrier Scope:
+- SY (System): Affects all observers
+- ISH (Inner Shareable): Within processor cluster
+- OSH (Outer Shareable): Between processor clusters
+- NSH (Non-Shareable): Local processor only
+
+Barrier Types:
+- (none): Full barrier (loads and stores)
+- LD: Load barrier only
+- ST: Store barrier only
+
+Common Synchronization Patterns:
+1. Acquire-Release pair: Producer-consumer synchronization
+2. DMB before critical operation: Ensure visibility
+3. DSB after critical operation: Wait for completion
+4. ISB after system changes: Flush pipeline
+
+Exclusive Monitor Pattern (spinlock):
+1. LDAXR - Load-acquire exclusive (mark address)
+2. Check value
+3. STLXR - Store-release exclusive (attempt to update)
+4. Check result register (0=success, 1=retry)
+5. Retry on failure
+
+================================================================================
+LEARNING TIPS
+================================================================================
+
+1. Start with hello_aarch64.s to understand basic program structure
+2. Study aarch64_examples.s section by section
+3. Each function demonstrates related instructions
+4. Read the inline comments for each instruction
+5. Try modifying values and re-compiling to experiment
+6. Use a debugger (lldb) to step through and watch register values
+7. For advanced topics (aarch64_advanced.s):
+   - Understand memory ordering before using atomic operations
+   - Be careful with exclusive operations - always check return values
+   - Some ARMv8.1+ instructions may not work on older processors
+
+================================================================================
+PROCESSOR FEATURE REQUIREMENTS
+================================================================================
+
+Base ARMv8.0:
+- All instructions in hello_aarch64.s
+- All instructions in aarch64_examples.s
+- All instructions in aarch64_floating_point.s
+- Basic atomics (LDAR/STLR, LDXR/STXR) in aarch64_advanced.s
+
+ARMv8.1-A or later required for:
+- LDADD, LDCLR, LDEOR, LDSET (atomic RMW operations)
+- LDSMAX, LDSMIN, LDUMAX, LDUMIN
+- SWP, CAS, CASP (single-instruction atomic operations)
+
+To check your processor features on macOS:
+  sysctl -a | grep cpu.features
+
+Happy learning!

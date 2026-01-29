@@ -1,0 +1,501 @@
+================================================================================
+AARCH64 STACK AND CALLING CONVENTIONS - DETAILED EXPLANATION
+================================================================================
+
+This document explains the aarch64 stack management, calling conventions, and
+the roles of frame pointer (fp/x29) and link register (lr/x30).
+
+================================================================================
+1. THE THREE KEY REGISTERS
+================================================================================
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ LINK REGISTER (x30 / lr)                                                 │
+├──────────────────────────────────────────────────────────────────────────┤
+│ • Stores the return address when a function is called                    │
+│ • BL instruction: lr = PC + 4, then PC = target                         │
+│ • BLR instruction: lr = PC + 4, then PC = register                      │
+│ • RET instruction: PC = lr (return to caller)                           │
+│ • Must be saved on stack if function calls other functions              │
+│ • When you call a function, lr gets overwritten with return address    │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ FRAME POINTER (x29 / fp)                                                 │
+├──────────────────────────────────────────────────────────────────────────┤
+│ • Points to the base of the current function's stack frame              │
+│ • Creates a linked list of frames for debugger stack traces            │
+│ • Allows access to local variables at fixed offsets                     │
+│ • Convention: [fp] = previous fp, [fp+8] = return address (saved lr)   │
+│ • Set at function entry: mov x29, sp                                    │
+│ • Optional but strongly recommended for debugging                        │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STACK POINTER (sp)                                                       │
+├──────────────────────────────────────────────────────────────────────────┤
+│ • Always points to the top of the stack (lowest used address)           │
+│ • Must be 16-byte aligned at function boundaries                        │
+│ • Grows downward (toward lower memory addresses)                        │
+│ • Modified by push/pop operations                                       │
+└──────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+2. THE STANDARD FUNCTION PROLOGUE/EPILOGUE
+================================================================================
+
+PROLOGUE (function entry):
+─────────────────────────────────────────────────────────────────────────────
+    stp x29, x30, [sp, #-16]!    // 1. Pre-decrement sp by 16
+                                  // 2. Store fp at [new_sp + 8]
+                                  // 3. Store lr at [new_sp]
+    
+    mov x29, sp                   // Set fp to point to saved fp/lr
+
+EPILOGUE (function exit):
+─────────────────────────────────────────────────────────────────────────────
+    ldp x29, x30, [sp], #16      // 1. Load fp from [sp + 8]
+                                  // 2. Load lr from [sp]
+                                  // 3. Post-increment sp by 16
+    
+    ret                           // PC = lr (return to caller)
+
+================================================================================
+3. VISUAL STACK LAYOUT WALKTHROUGH
+================================================================================
+
+BEFORE FUNCTION CALL:
+─────────────────────────────────────────────────────────────────────────────
+Higher addresses ↑
+                 │
+    ┌────────────────────┐
+    │  Caller's frame    │
+    │                    │
+    ├────────────────────┤ ← sp (16-byte aligned)
+    │                    │
+                 │
+Lower addresses  ↓
+
+
+AFTER "stp x29, x30, [sp, #-16]!":
+─────────────────────────────────────────────────────────────────────────────
+    ┌────────────────────┐
+    │  Caller's frame    │
+    │                    │
+    ├────────────────────┤ ← old sp
+    │   Saved FP (x29)   │ ← sp + 8
+    ├────────────────────┤
+    │   Saved LR (x30)   │ ← sp (new stack pointer)
+    ├────────────────────┤
+    │                    │
+
+
+AFTER "mov x29, sp":
+─────────────────────────────────────────────────────────────────────────────
+    ┌────────────────────┐
+    │  Caller's frame    │
+    │                    │
+    ├────────────────────┤
+    │   Saved FP (x29)   │ ← fp + 8 (points to caller's frame)
+    ├────────────────────┤
+    │   Saved LR (x30)   │ ← sp, fp (frame base)
+    ├────────────────────┤
+    │                    │
+                 │
+                 ↓
+
+Now fp points to the frame base, creating a chain:
+    Current FP → [fp] → [fp] → ... → NULL
+
+================================================================================
+4. FUNCTION WITH LOCAL VARIABLES
+================================================================================
+
+PROLOGUE with locals:
+─────────────────────────────────────────────────────────────────────────────
+    stp x29, x30, [sp, #-64]!    // Allocate 64 bytes total
+    mov x29, sp
+
+RESULTING STACK LAYOUT:
+─────────────────────────────────────────────────────────────────────────────
+    ┌────────────────────┐
+    │  Caller's frame    │
+    ├────────────────────┤ ← fp + 64 (old sp)
+    │                    │
+    │   56 bytes for     │   [fp + 16] through [fp + 63]
+    │   local variables  │   Available for locals
+    │   and saved regs   │
+    │                    │
+    ├────────────────────┤ ← fp + 8
+    │   Saved FP (x29)   │   Pointer to caller's frame
+    ├────────────────────┤ ← fp (sp)
+    │   Saved LR (x30)   │   Return address
+    └────────────────────┘
+
+ACCESSING LOCAL VARIABLES:
+─────────────────────────────────────────────────────────────────────────────
+    mov x0, #42
+    str x0, [sp, #16]            // Store in local var 1
+    str x0, [fp, #16]            // Same thing (fp = sp at this point)
+    
+    mov x1, #100
+    str x1, [sp, #24]            // Store in local var 2
+
+================================================================================
+5. CALLEE-SAVED REGISTER PATTERN
+================================================================================
+
+If using x19-x28, you MUST save and restore them:
+─────────────────────────────────────────────────────────────────────────────
+    stp x29, x30, [sp, #-48]!    // Save fp/lr, allocate 48 bytes
+    mov x29, sp
+    stp x19, x20, [sp, #16]      // Save x19, x20
+    stp x21, x22, [sp, #32]      // Save x21, x22
+    
+    // Use x19-x22 freely - they're preserved across function calls
+    mov x19, #1
+    bl some_function             // x19-x22 unchanged after return
+    
+    // Restore in REVERSE order
+    ldp x21, x22, [sp, #32]
+    ldp x19, x20, [sp, #16]
+    ldp x29, x30, [sp], #48
+    ret
+
+STACK LAYOUT:
+─────────────────────────────────────────────────────────────────────────────
+    ┌────────────────────┐ ← fp + 48
+    │   8 bytes avail    │ [fp + 40] to [fp + 47]
+    ├────────────────────┤ ← fp + 32
+    │  Saved x21, x22    │
+    ├────────────────────┤ ← fp + 24
+    │   8 bytes avail    │
+    ├────────────────────┤ ← fp + 16
+    │  Saved x19, x20    │
+    ├────────────────────┤ ← fp + 8
+    │   Saved FP (x29)   │
+    ├────────────────────┤ ← fp (sp)
+    │   Saved LR (x30)   │
+    └────────────────────┘
+
+================================================================================
+6. CALLING CONVENTION - PARAMETER PASSING
+================================================================================
+
+INTEGER/POINTER PARAMETERS:
+─────────────────────────────────────────────────────────────────────────────
+    x0 = 1st parameter
+    x1 = 2nd parameter
+    x2 = 3rd parameter
+    x3 = 4th parameter
+    x4 = 5th parameter
+    x5 = 6th parameter
+    x6 = 7th parameter
+    x7 = 8th parameter
+    [sp + 0]  = 9th parameter   (on stack)
+    [sp + 8]  = 10th parameter  (on stack)
+    [sp + 16] = 11th parameter  (on stack)
+    ...
+
+FLOATING-POINT PARAMETERS:
+─────────────────────────────────────────────────────────────────────────────
+    v0 (s0/d0) = 1st FP parameter
+    v1 (s1/d1) = 2nd FP parameter
+    ...
+    v7 (s7/d7) = 8th FP parameter
+    Stack for additional FP parameters
+
+RETURN VALUES:
+─────────────────────────────────────────────────────────────────────────────
+    x0 = integer/pointer return value
+    v0 = floating-point return value
+    x0, x1 = 128-bit return value (x0=low, x1=high)
+
+================================================================================
+7. REGISTER USAGE RULES
+================================================================================
+
+CALLER-SAVED (Caller must save if needed before calling):
+─────────────────────────────────────────────────────────────────────────────
+    x0-x18      General purpose and parameters (can be destroyed by callee)
+    v0-v7       FP parameters and return (can be destroyed)
+    v16-v31     SIMD temporaries (can be destroyed)
+
+CALLEE-SAVED (Callee must save and restore if used):
+─────────────────────────────────────────────────────────────────────────────
+    x19-x28     General purpose (must be preserved)
+    x29 (fp)    Frame pointer (must be preserved)
+    x30 (lr)    Link register (must be preserved if making calls)
+    v8-v15      SIMD lower 64 bits (must be preserved)
+    sp          Stack pointer (must be preserved and aligned)
+
+SPECIAL REGISTERS:
+─────────────────────────────────────────────────────────────────────────────
+    x18         Platform register (reserved, don't use)
+    x29         Frame pointer (fp)
+    x30         Link register (lr)
+    sp          Stack pointer (must be 16-byte aligned)
+    xzr/wzr     Zero register (reads as 0, writes ignored)
+
+================================================================================
+8. THE FRAME POINTER CHAIN (for stack traces)
+================================================================================
+
+When functions follow the standard prologue, fp creates a linked list:
+
+Call sequence: main() → func_a() → func_b() → func_c()
+
+    ┌──────────────────┐
+    │ main's frame     │
+    ├──────────────────┤
+    │ [fp] = NULL or   │ ← main's fp
+    │      _start's fp │
+    │ [fp+8] = return  │
+    │      to _start   │
+    ├──────────────────┤
+    │ func_a's frame   │
+    ├──────────────────┤
+    │ [fp] = main's fp │ ← func_a's fp (points up to main's fp)
+    │ [fp+8] = return  │
+    │      to main     │
+    ├──────────────────┤
+    │ func_b's frame   │
+    ├──────────────────┤
+    │ [fp] = func_a fp │ ← func_b's fp (points up to func_a's fp)
+    │ [fp+8] = return  │
+    │      to func_a   │
+    ├──────────────────┤
+    │ func_c's frame   │
+    ├──────────────────┤
+    │ [fp] = func_b fp │ ← func_c's fp (points up to func_b's fp)
+    │ [fp+8] = return  │
+    │      to func_b   │
+    └──────────────────┘
+
+Debugger walks the chain:
+    current fp → [fp] → [fp] → [fp] → NULL
+
+At each frame, [fp+8] gives the return address (saved lr).
+
+================================================================================
+9. LEAF vs NON-LEAF FUNCTIONS
+================================================================================
+
+LEAF FUNCTION (doesn't call anyone):
+─────────────────────────────────────────────────────────────────────────────
+    // Minimal - no prologue needed if we don't use callee-saved registers
+    leaf_function:
+        mov x0, #42
+        ret
+    
+    // Recommended - for debugging
+    leaf_function_debuggable:
+        stp x29, x30, [sp, #-16]!
+        mov x29, sp
+        mov x0, #42
+        ldp x29, x30, [sp], #16
+        ret
+
+NON-LEAF FUNCTION (calls other functions):
+─────────────────────────────────────────────────────────────────────────────
+    non_leaf_function:
+        stp x29, x30, [sp, #-16]!   // MUST save lr
+        mov x29, sp
+        
+        bl other_function            // Overwrites lr
+        
+        ldp x29, x30, [sp], #16     // Restore lr
+        ret                          // Return to our caller
+
+================================================================================
+10. TAIL CALL OPTIMIZATION
+================================================================================
+
+Normal call and return:
+─────────────────────────────────────────────────────────────────────────────
+    function_a:
+        stp x29, x30, [sp, #-16]!
+        mov x29, sp
+        
+        // ... do work ...
+        
+        bl function_b               // Call function_b
+        ldp x29, x30, [sp], #16    // Restore our frame
+        ret                         // Return to our caller
+
+Tail call (last action is calling another function):
+─────────────────────────────────────────────────────────────────────────────
+    function_a:
+        stp x29, x30, [sp, #-16]!
+        mov x29, sp
+        
+        // ... do work ...
+        
+        ldp x29, x30, [sp], #16    // Restore our frame FIRST
+        b function_b                // Jump (not call) to function_b
+        
+    // function_b will return directly to function_a's caller
+    // Saves one level of call/return
+
+================================================================================
+11. COMMON PATTERNS AND IDIOMS
+================================================================================
+
+PATTERN 1: Simple function with no calls
+─────────────────────────────────────────────────────────────────────────────
+    simple_func:
+        stp x29, x30, [sp, #-16]!
+        mov x29, sp
+        // work
+        ldp x29, x30, [sp], #16
+        ret
+
+PATTERN 2: Function with local variables
+─────────────────────────────────────────────────────────────────────────────
+    func_with_locals:
+        stp x29, x30, [sp, #-32]!   // Extra 16 bytes for locals
+        mov x29, sp
+        // Use [sp, #16] and [sp, #24] for locals
+        ldp x29, x30, [sp], #32
+        ret
+
+PATTERN 3: Function using callee-saved registers
+─────────────────────────────────────────────────────────────────────────────
+    func_with_saved_regs:
+        stp x29, x30, [sp, #-32]!
+        mov x29, sp
+        stp x19, x20, [sp, #16]     // Save x19, x20
+        // Use x19, x20 freely
+        ldp x19, x20, [sp, #16]     // Restore
+        ldp x29, x30, [sp], #32
+        ret
+
+PATTERN 4: Function calling other functions
+─────────────────────────────────────────────────────────────────────────────
+    caller_func:
+        stp x29, x30, [sp, #-16]!
+        mov x29, sp
+        bl callee_func              // lr overwritten here
+        ldp x29, x30, [sp], #16     // Restore original lr
+        ret
+
+================================================================================
+12. DEBUGGING WITH FRAME POINTERS
+================================================================================
+
+With proper frame pointers, you can:
+
+1. Get a backtrace (lldb command: bt)
+2. Inspect local variables at any frame level
+3. Understand the call chain
+
+Example lldb session:
+─────────────────────────────────────────────────────────────────────────────
+    (lldb) register read x29 x30 sp
+    x29 = 0x000000016fdff3e0    # Current frame pointer
+    x30 = 0x0000000100003f8c    # Return address
+     sp = 0x000000016fdff3e0    # Stack pointer
+    
+    (lldb) memory read $x29
+    0x16fdff3e0: 0x16fdff3f0 0x100003f2c    # Previous fp, return address
+    
+    (lldb) bt
+    * frame #0: function_c
+      frame #1: function_b
+      frame #2: function_a
+      frame #3: main
+
+================================================================================
+13. QUICK REFERENCE CHEAT SHEET
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STANDARD PROLOGUE                                                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│   stp x29, x30, [sp, #-N]!    // N >= 16, 16-byte aligned             │
+│   mov x29, sp                                                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│ STANDARD EPILOGUE                                                       │
+├─────────────────────────────────────────────────────────────────────────┤
+│   ldp x29, x30, [sp], #N                                               │
+│   ret                                                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ SAVE CALLEE-SAVED REGS                                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│   stp x19, x20, [sp, #offset]                                          │
+│   ...                                                                   │
+│   ldp x19, x20, [sp, #offset]  // Before epilogue                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ PARAMETER REGISTERS                                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│   x0-x7: Integer/pointer args                                          │
+│   v0-v7: FP args                                                       │
+│   [sp+0], [sp+8], ...: Stack args (at caller's sp before call)        │
+├─────────────────────────────────────────────────────────────────────────┤
+│ RETURN VALUES                                                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│   x0: Integer/pointer                                                  │
+│   v0: Floating-point                                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+14. COMMON MISTAKES TO AVOID
+================================================================================
+
+❌ MISTAKE 1: Not saving lr when calling functions
+    function:
+        bl other_func        // Overwrites lr!
+        ret                  // Returns to wrong place!
+
+✅ CORRECT:
+    function:
+        stp x29, x30, [sp, #-16]!
+        mov x29, sp
+        bl other_func
+        ldp x29, x30, [sp], #16
+        ret
+
+❌ MISTAKE 2: Unaligned stack
+    stp x29, x30, [sp, #-8]!    // Wrong! Must be 16-byte aligned
+
+✅ CORRECT:
+    stp x29, x30, [sp, #-16]!   // Correct: 16-byte aligned
+
+❌ MISTAKE 3: Not restoring callee-saved registers
+    function:
+        mov x19, #42         // Using x19
+        ret                  // x19 not restored!
+
+✅ CORRECT:
+    function:
+        stp x29, x30, [sp, #-32]!
+        mov x29, sp
+        str x19, [sp, #16]   // Save x19
+        mov x19, #42         // Use x19
+        ldr x19, [sp, #16]   // Restore x19
+        ldp x29, x30, [sp], #32
+        ret
+
+❌ MISTAKE 4: Wrong epilogue order
+    function:
+        stp x29, x30, [sp, #-32]!
+        mov x29, sp
+        stp x19, x20, [sp, #16]
+        // ...
+        ldp x29, x30, [sp], #32     // Wrong! x19/x20 not restored
+        ldp x19, x20, [sp, #16]     // Too late! sp already moved
+        ret
+
+✅ CORRECT:
+    function:
+        stp x29, x30, [sp, #-32]!
+        mov x29, sp
+        stp x19, x20, [sp, #16]
+        // ...
+        ldp x19, x20, [sp, #16]     // Restore BEFORE epilogue
+        ldp x29, x30, [sp], #32
+        ret
+
+================================================================================
+END OF STACK AND CALLING CONVENTIONS GUIDE
+================================================================================
